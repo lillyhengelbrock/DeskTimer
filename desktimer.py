@@ -1,8 +1,9 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 import asyncio
 from dotenv import load_dotenv
 import os
+import time
 
 # Load environment variables from .env
 load_dotenv()
@@ -11,13 +12,13 @@ load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 # Set your default work and break times in seconds
-WORK_TIME = 25 * 60  # 25 minutes
-BREAK_TIME = 5 * 60  # 5 minutes
+WORK_TIME = 25
+BREAK_TIME = 5
 DEFAULT_ROUNDS = 4 # timer repeats 4 times
 
 # Create a dictionary to store voice channel IDs per server
 voice_channel_ids = {}
-timer_running=False
+timer_running = False
 # Create intents and enable the necessary ones
 intents = discord.Intents.default()
 intents.messages = True  # Enable message content intent
@@ -35,7 +36,7 @@ def format_time(seconds):
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name} ({bot.user.id})')
-    await bot.change_presence(activity=discord.Game(name="!startpomodoro"))
+    await bot.change_presence(activity=discord.Game(name="!timer"))
 
 # Function to play the sound in a voice channel
 async def play_sound_vc(channel):
@@ -50,6 +51,7 @@ async def play_sound_vc(channel):
 # Timer task with dynamic message update
 async def timer_work_vc(ctx, duration):
     global timer_running
+    global voice_channel_ids
     channel_id = voice_channel_ids.get(ctx.guild.id)
     if not timer_running:
         return
@@ -62,7 +64,7 @@ async def timer_work_vc(ctx, duration):
                 if not timer_running:
                     await ctx.send('Timer interrupted.')
                     return
-                await asyncio.sleep(1)
+                time.sleep(1)
                 await message.edit(content=f'Work: {format_time(remaining_time)}')
 
             await play_sound_vc(channel)
@@ -73,6 +75,7 @@ async def timer_work_vc(ctx, duration):
 
 async def timer_break_vc(ctx, duration):
     global timer_running
+    global voice_channel_ids
     channel_id = voice_channel_ids.get(ctx.guild.id)
     if not timer_running:
         return
@@ -84,7 +87,7 @@ async def timer_break_vc(ctx, duration):
             for remaining_time in range(duration, 0, -1):
                 if not timer_running:
                     return
-                await asyncio.sleep(1)
+                time.sleep(1)
                 await message.edit(content=f'Break: {format_time(remaining_time)}')
 
             await play_sound_vc(channel)
@@ -101,8 +104,11 @@ async def set_voice_channel(ctx, channel_id: int):
 
 # Command to start the Pomodoro timer with sound in the configured voice channel
 @bot.command(name='timer')
-async def start_pomodoro_vc(ctx, rounds: int =DEFAULT_ROUNDS, work_time: int =WORK_TIME, break_time: int =BREAK_TIME):
+async def start_pomodoro_vc(ctx, rounds: int =DEFAULT_ROUNDS, work_time_minutes: int =WORK_TIME, break_time_minutes: int =BREAK_TIME):
     global timer_running
+    global voice_channel_ids
+    work_time = work_time_minutes * 60
+    break_time = break_time_minutes * 60
     timer_running = True
     await ctx.send("Timer started - Let's go!")
     for _ in range(rounds):
